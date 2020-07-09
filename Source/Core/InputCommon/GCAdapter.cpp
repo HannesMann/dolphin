@@ -85,7 +85,7 @@ static void Read()
   while (s_adapter_thread_running.IsSet())
   {
     int err = libusb_interrupt_transfer(s_handle, s_endpoint_in, s_controller_payload_swap,
-                                        sizeof(s_controller_payload_swap), &payload_size, 16);
+                                        sizeof(s_controller_payload_swap), &payload_size, 32);
     if (err)
       ERROR_LOG(SERIALINTERFACE, "adapter libusb read failed: err=%s", libusb_error_name(err));
 
@@ -113,7 +113,7 @@ static void Write()
     u8 payload[5] = {0x11, s_controller_rumble[0], s_controller_rumble[1], s_controller_rumble[2],
                      s_controller_rumble[3]};
     int err =
-        libusb_interrupt_transfer(s_handle, s_endpoint_out, payload, sizeof(payload), &size, 16);
+        libusb_interrupt_transfer(s_handle, s_endpoint_out, payload, sizeof(payload), &size, 32);
     if (err)
       ERROR_LOG(SERIALINTERFACE, "adapter libusb write failed: err=%s", libusb_error_name(err));
   }
@@ -354,7 +354,7 @@ static void AddGCAdapter(libusb_device* device)
 
   int tmp = 0;
   unsigned char payload = 0x13;
-  libusb_interrupt_transfer(s_handle, s_endpoint_out, &payload, sizeof(payload), &tmp, 16);
+  libusb_interrupt_transfer(s_handle, s_endpoint_out, &payload, sizeof(payload), &tmp, 32);
 
   s_adapter_thread_running.Set(true);
   s_adapter_input_thread = std::thread(Read);
@@ -575,7 +575,7 @@ static void ResetRumbleLockNeeded()
                              s_controller_rumble[2], s_controller_rumble[3]};
 
   int size = 0;
-  libusb_interrupt_transfer(s_handle, s_endpoint_out, rumble, sizeof(rumble), &size, 16);
+  libusb_interrupt_transfer(s_handle, s_endpoint_out, rumble, sizeof(rumble), &size, 32);
 
   INFO_LOG(SERIALINTERFACE, "Rumble state reset");
 }
