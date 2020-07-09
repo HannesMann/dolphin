@@ -137,12 +137,9 @@ void SpeakerLogic::SpeakerData(const u8* data, int length, float speaker_pan)
   const auto left_volume = std::min(int(std::cos(pan_prime) * volume), 255);
   const auto right_volume = std::min(int(std::sin(pan_prime) * volume), 255);
 
-  g_sound_stream->GetMixer()->SetWiimoteSpeakerVolume(left_volume, right_volume);
 
   // ADPCM sample rate is thought to be x2.(3000 x2 = 6000).
   const unsigned int sample_rate = sample_rate_dividend / reg_data.sample_rate;
-  g_sound_stream->GetMixer()->PushWiimoteSpeakerSamples(samples.get(), sample_length,
-                                                        sample_rate * 2);
 
 #ifdef WIIMOTE_SPEAKER_DUMP
   static int num = 0;

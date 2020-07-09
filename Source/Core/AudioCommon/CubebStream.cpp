@@ -3,6 +3,8 @@
 // Refer to the license.txt file included.
 
 #include <cubeb/cubeb.h>
+#include <algorithm>
+#include <cmath>
 
 #include "AudioCommon/CubebStream.h"
 #include "AudioCommon/CubebUtils.h"
@@ -10,9 +12,12 @@
 #include "Common/Logging/Log.h"
 #include "Common/Thread.h"
 #include "Core/ConfigManager.h"
+#include "Core/Core.h"
+#include "Common/Swap.h"
 
-// ~10 ms - needs to be at least 240 for surround
-constexpr u32 BUFFER_SAMPLES = 512;
+// For SSBM: keep two "PushSamples" as a buffer
+// TODO: adjustable
+constexpr u32 MIN_BUFFER_FRAMES = 160 * 3;
 
 long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void* /*input_buffer*/,
                                void* output_buffer, long num_frames)
@@ -20,9 +25,23 @@ long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void
   auto* self = static_cast<CubebStream*>(user_data);
 
   if (self->m_stereo)
-    self->m_mixer->Mix(static_cast<short*>(output_buffer), num_frames);
-  else
-    self->m_mixer->MixSurround(static_cast<float*>(output_buffer), num_frames);
+  {
+    std::lock_guard<std::mutex> guard(self->m_short_buffer_mutex);
+
+    for(std::size_t sample = 0; sample < num_frames * 2; sample += 2)
+    {
+      static_cast<short*>(output_buffer)[sample] =
+        Common::swap16(sample >= self->m_short_buffer.size() ? 0 : self->m_short_buffer[sample]);
+      static_cast<short*>(output_buffer)[sample + 1] =
+        Common::swap16(sample + 1 >= self->m_short_buffer.size() ? 0 : self->m_short_buffer[sample + 1]);
+    }
+
+    if(self->m_short_buffer.size() < num_frames * 2)
+      self->m_short_buffer.erase(self->m_short_buffer.begin(), self->m_short_buffer.end());
+    else
+      self->m_short_buffer.erase(self->m_short_buffer.begin(), self->m_short_buffer.begin() + num_frames * 2);
+  }
+  else { /* TODO */ }
 
   return num_frames;
 }
@@ -40,7 +59,7 @@ bool CubebStream::Init()
   m_stereo = !SConfig::GetInstance().ShouldUseDPL2Decoder();
 
   cubeb_stream_params params;
-  params.rate = m_mixer->GetSampleRate();
+  params.rate = 32000;
   if (m_stereo)
   {
     params.channels = 2;
@@ -59,8 +78,12 @@ bool CubebStream::Init()
     ERROR_LOG(AUDIO, "Error getting minimum latency");
   INFO_LOG(AUDIO, "Minimum latency: %i frames", minimum_latency);
 
+  m_max_frames_in_flight = MIN_BUFFER_FRAMES;
+  m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
+  m_short_buffer.reserve(m_max_frames_in_flight * 2);
+
   return cubeb_stream_init(m_ctx.get(), &m_stream, "Dolphin Audio Output", nullptr, nullptr,
-                           nullptr, &params, std::max(BUFFER_SAMPLES, minimum_latency),
+                           nullptr, &params, std::max(minimum_latency, MIN_BUFFER_FRAMES),
                            DataCallback, StateCallback, this) == CUBEB_OK;
 }
 
@@ -82,4 +105,16 @@ CubebStream::~CubebStream()
 void CubebStream::SetVolume(int volume)
 {
   cubeb_stream_set_volume(m_stream, volume / 100.0f);
+}
+
+void CubebStream::PushSamples(const short* samples, unsigned int num_samples)
+{
+  if(samples)
+  {
+    std::lock_guard<std::mutex> guard(m_short_buffer_mutex);
+    m_short_buffer.insert(m_short_buffer.end(), &samples[0], &samples[num_samples * 2] /* last is L+R */);
+
+    if(m_short_buffer.size() > m_max_frames_in_flight * 2)
+      m_short_buffer.erase(m_short_buffer.begin(), m_short_buffer.end() - m_max_frames_in_flight * 2);
+  }
 }

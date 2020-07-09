@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
+#include <mutex>
 
 #include "AudioCommon/SoundStream.h"
 
@@ -19,6 +20,7 @@ public:
   bool Init() override;
   bool SetRunning(bool running) override;
   void SetVolume(int) override;
+  void PushSamples(const short* samples, unsigned int num_samples) override;
 
 private:
   bool m_stereo = false;
@@ -26,7 +28,8 @@ private:
   cubeb_stream* m_stream = nullptr;
 
   std::vector<short> m_short_buffer;
-  std::vector<float> m_floatstereo_buffer;
+  std::mutex m_short_buffer_mutex;
+  u32 m_max_frames_in_flight = 0;
 
   static long DataCallback(cubeb_stream* stream, void* user_data, const void* /*input_buffer*/,
                            void* output_buffer, long num_frames);

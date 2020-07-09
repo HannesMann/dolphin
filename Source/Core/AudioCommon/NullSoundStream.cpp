@@ -22,6 +22,6 @@ void NullSound::SetVolume(int volume)
 {
 }
 
-void NullSound::Update()
+void NullSound::PushSamples(const short* samples, unsigned int num_samples)
 {
 }

@@ -3,13 +3,8 @@
 // Refer to the license.txt file included.
 
 #include "AudioCommon/AudioCommon.h"
-#include "AudioCommon/AlsaSoundStream.h"
 #include "AudioCommon/CubebStream.h"
-#include "AudioCommon/Mixer.h"
 #include "AudioCommon/NullSoundStream.h"
-#include "AudioCommon/OpenALStream.h"
-#include "AudioCommon/OpenSLESStream.h"
-#include "AudioCommon/PulseAudioStream.h"
 #include "AudioCommon/WASAPIStream.h"
 #include "Common/Common.h"
 #include "Common/FileUtil.h"
@@ -31,16 +26,8 @@ static std::unique_ptr<SoundStream> CreateSoundStreamForBackend(std::string_view
 {
   if (backend == BACKEND_CUBEB)
     return std::make_unique<CubebStream>();
-  else if (backend == BACKEND_OPENAL && OpenALStream::isValid())
-    return std::make_unique<OpenALStream>();
   else if (backend == BACKEND_NULLSOUND)
     return std::make_unique<NullSound>();
-  else if (backend == BACKEND_ALSA && AlsaSound::isValid())
-    return std::make_unique<AlsaSound>();
-  else if (backend == BACKEND_PULSEAUDIO && PulseAudio::isValid())
-    return std::make_unique<PulseAudio>();
-  else if (backend == BACKEND_OPENSLES && OpenSLESStream::isValid())
-    return std::make_unique<OpenSLESStream>();
   else if (backend == BACKEND_WASAPI && WASAPIStream::isValid())
     return std::make_unique<WASAPIStream>();
   return {};
@@ -89,17 +76,7 @@ void ShutdownSoundStream()
 
 std::string GetDefaultSoundBackend()
 {
-  std::string backend = BACKEND_NULLSOUND;
-#if defined ANDROID
-  backend = BACKEND_OPENSLES;
-#elif defined __linux__
-  if (PulseAudio::isValid())
-    backend = BACKEND_PULSEAUDIO;
-  else if (AlsaSound::isValid())
-    backend = BACKEND_ALSA;
-#elif defined(__APPLE__) || defined(_WIN32)
-  backend = BACKEND_CUBEB;
-#endif
+  std::string backend = BACKEND_CUBEB;
   return backend;
 }
 
@@ -114,14 +91,6 @@ std::vector<std::string> GetSoundBackends()
 
   backends.emplace_back(BACKEND_NULLSOUND);
   backends.emplace_back(BACKEND_CUBEB);
-  if (AlsaSound::isValid())
-    backends.emplace_back(BACKEND_ALSA);
-  if (PulseAudio::isValid())
-    backends.emplace_back(BACKEND_PULSEAUDIO);
-  if (OpenALStream::isValid())
-    backends.emplace_back(BACKEND_OPENAL);
-  if (OpenSLESStream::isValid())
-    backends.emplace_back(BACKEND_OPENSLES);
   if (WASAPIStream::isValid())
     backends.emplace_back(BACKEND_WASAPI);
 
@@ -130,20 +99,12 @@ std::vector<std::string> GetSoundBackends()
 
 bool SupportsDPL2Decoder(std::string_view backend)
 {
-#ifndef __APPLE__
-  if (backend == BACKEND_OPENAL)
-    return true;
-#endif
-  if (backend == BACKEND_CUBEB)
-    return true;
-  if (backend == BACKEND_PULSEAUDIO)
-    return true;
   return false;
 }
 
 bool SupportsLatencyControl(std::string_view backend)
 {
-  return backend == BACKEND_OPENAL || backend == BACKEND_WASAPI;
+  return backend == BACKEND_WASAPI;
 }
 
 bool SupportsVolumeChanges(std::string_view backend)
@@ -151,7 +112,7 @@ bool SupportsVolumeChanges(std::string_view backend)
   // FIXME: this one should ask the backend whether it supports it.
   //       but getting the backend from string etc. is probably
   //       too much just to enable/disable a stupid slider...
-  return backend == BACKEND_CUBEB || backend == BACKEND_OPENAL || backend == BACKEND_WASAPI;
+  return backend == BACKEND_CUBEB || backend == BACKEND_WASAPI;
 }
 
 void UpdateSoundStream()
@@ -190,14 +151,7 @@ void SendAIBuffer(const short* samples, unsigned int num_samples)
   else if (!SConfig::GetInstance().m_DumpAudio && s_audio_dump_start)
     StopAudioDump();
 
-  Mixer* pMixer = g_sound_stream->GetMixer();
-
-  if (pMixer && samples)
-  {
-    pMixer->PushSamples(samples, num_samples);
-  }
-
-  g_sound_stream->Update();
+  g_sound_stream->PushSamples(samples, num_samples);
 }
 
 void StartAudioDump()
@@ -206,8 +160,6 @@ void StartAudioDump()
   std::string audio_file_name_dsp = File::GetUserPath(D_DUMPAUDIO_IDX) + "dspdump.wav";
   File::CreateFullPath(audio_file_name_dtk);
   File::CreateFullPath(audio_file_name_dsp);
-  g_sound_stream->GetMixer()->StartLogDTKAudio(audio_file_name_dtk);
-  g_sound_stream->GetMixer()->StartLogDSPAudio(audio_file_name_dsp);
   s_audio_dump_start = true;
 }
 
@@ -215,8 +167,6 @@ void StopAudioDump()
 {
   if (!g_sound_stream)
     return;
-  g_sound_stream->GetMixer()->StopLogDTKAudio();
-  g_sound_stream->GetMixer()->StopLogDSPAudio();
   s_audio_dump_start = false;
 }
 

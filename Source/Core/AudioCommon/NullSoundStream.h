@@ -13,7 +13,7 @@ public:
   void SoundLoop() override;
   bool SetRunning(bool running) override;
   void SetVolume(int volume) override;
-  void Update() override;
+  void PushSamples(const short* samples, unsigned int num_samples) override;
 
   static bool isValid() { return true; }
 };
