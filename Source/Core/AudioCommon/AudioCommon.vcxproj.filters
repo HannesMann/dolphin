@@ -9,12 +9,8 @@
     <ClCompile Include="AudioCommon.cpp" />
     <ClCompile Include="AudioStretcher.cpp" />
     <ClCompile Include="CubebUtils.cpp" />
-    <ClCompile Include="Mixer.cpp" />
     <ClCompile Include="WaveFile.cpp" />
     <ClCompile Include="NullSoundStream.cpp">
-      <Filter>SoundStreams</Filter>
-    </ClCompile>
-    <ClCompile Include="OpenALStream.cpp">
       <Filter>SoundStreams</Filter>
     </ClCompile>
     <ClCompile Include="CubebStream.cpp">
@@ -32,18 +28,6 @@
     <ClInclude Include="Mixer.h" />
     <ClInclude Include="WaveFile.h" />
     <ClInclude Include="NullSoundStream.h">
-      <Filter>SoundStreams</Filter>
-    </ClInclude>
-    <ClInclude Include="OpenALStream.h">
-      <Filter>SoundStreams</Filter>
-    </ClInclude>
-    <ClInclude Include="PulseAudioStream.h">
-      <Filter>SoundStreams</Filter>
-    </ClInclude>
-    <ClInclude Include="OpenSLESStream.h">
-      <Filter>SoundStreams</Filter>
-    </ClInclude>
-    <ClInclude Include="AlsaSoundStream.h">
       <Filter>SoundStreams</Filter>
     </ClInclude>
     <ClInclude Include="SoundStream.h">

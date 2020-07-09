@@ -48,15 +48,12 @@
     <ClCompile Include="AudioStretcher.cpp" />
     <ClCompile Include="CubebStream.cpp" />
     <ClCompile Include="CubebUtils.cpp" />
-    <ClCompile Include="Mixer.cpp" />
     <ClCompile Include="NullSoundStream.cpp" />
-    <ClCompile Include="OpenALStream.cpp" />
     <ClCompile Include="WASAPIStream.cpp" />
     <ClCompile Include="SurroundDecoder.cpp" />
     <ClCompile Include="WaveFile.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AlsaSoundStream.h" />
     <ClInclude Include="AudioCommon.h" />
     <ClInclude Include="AudioStretcher.h" />
     <ClInclude Include="CubebStream.h" />
@@ -64,9 +61,6 @@
     <ClInclude Include="Enums.h" />
     <ClInclude Include="Mixer.h" />
     <ClInclude Include="NullSoundStream.h" />
-    <ClInclude Include="OpenALStream.h" />
-    <ClInclude Include="OpenSLESStream.h" />
-    <ClInclude Include="PulseAudioStream.h" />
     <ClInclude Include="SoundStream.h" />
     <ClInclude Include="WASAPIStream.h" />
     <ClInclude Include="SurroundDecoder.h" />
