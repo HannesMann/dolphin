@@ -416,7 +416,7 @@ void SConfig::LoadInterfaceSettings(IniFile& ini)
   interface->Get("LanguageCode", &m_InterfaceLanguage, "");
   interface->Get("ExtendedFPSInfo", &m_InterfaceExtendedFPSInfo, false);
   interface->Get("ShowActiveTitle", &m_show_active_title, true);
-  interface->Get("UseBuiltinTitleDatabase", &m_use_builtin_title_database, true);
+  interface->Get("UseBuiltinTitleDatabase", &m_use_builtin_title_database, false);
   interface->Get("ThemeName", &theme_name, DEFAULT_THEME_DIR);
   interface->Get("PauseOnFocusLost", &m_PauseOnFocusLost, false);
   interface->Get("DebugModeEnabled", &bEnableDebugging, false);
@@ -484,7 +484,7 @@ void SConfig::LoadCoreSettings(IniFile& ini)
   core->Get("TimingVariance", &iTimingVariance, 40);
   core->Get("CPUThread", &bCPUThread, true);
   core->Get("SyncOnSkipIdle", &bSyncGPUOnSkipIdleHack, true);
-  core->Get("EnableCheats", &bEnableCheats, false);
+  core->Get("EnableCheats", &bEnableCheats, true);
   core->Get("SelectedLanguage", &SelectedLanguage, 0);
   core->Get("OverrideRegionSettings", &bOverrideRegionSettings, false);
   core->Get("DPL2Decoder", &bDPL2Decoder, false);
@@ -502,7 +502,7 @@ void SConfig::LoadCoreSettings(IniFile& ini)
   for (size_t i = 0; i < std::size(m_SIDevice); ++i)
   {
     core->Get(fmt::format("SIDevice{}", i), &m_SIDevice[i],
-              (i == 0) ? SerialInterface::SIDEVICE_GC_CONTROLLER : SerialInterface::SIDEVICE_NONE);
+              SerialInterface::SIDEVICE_WIIU_ADAPTER);
     core->Get(fmt::format("AdapterRumble{}", i), &m_AdapterRumble[i], true);
     core->Get(fmt::format("SimulateKonga{}", i), &m_AdapterKonga[i], false);
   }
