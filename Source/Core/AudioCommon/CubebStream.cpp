@@ -15,9 +15,7 @@
 #include "Core/Core.h"
 #include "Common/Swap.h"
 
-// For SSBM: keep two "PushSamples" as a buffer
-// TODO: adjustable
-constexpr u32 MIN_BUFFER_FRAMES = 160 * 3;
+constexpr u32 MIN_BUFFER_FRAMES = 160;
 
 long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void* /*input_buffer*/,
                                void* output_buffer, long num_frames)
@@ -78,7 +76,7 @@ bool CubebStream::Init()
     ERROR_LOG(AUDIO, "Error getting minimum latency");
   INFO_LOG(AUDIO, "Minimum latency: %i frames", minimum_latency);
 
-  m_max_frames_in_flight = MIN_BUFFER_FRAMES;
+  m_max_frames_in_flight = std::max(minimum_latency, MIN_BUFFER_FRAMES) + 32;
   m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
   m_short_buffer.reserve(m_max_frames_in_flight * 2);
 
