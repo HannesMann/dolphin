@@ -199,7 +199,8 @@ u16 VideoBackendBase::Video_GetBoundingBox(int index)
 
 void VideoBackendBase::PopulateList()
 {
-  // OGL > D3D11 > Vulkan > SW > Null
+  // Vulkan > OGL > D3D11 > SW > Null
+  g_available_video_backends.push_back(std::make_unique<Vulkan::VideoBackend>());
 #ifdef HAS_OPENGL
   g_available_video_backends.push_back(std::make_unique<OGL::VideoBackend>());
 #endif
@@ -207,7 +208,6 @@ void VideoBackendBase::PopulateList()
   g_available_video_backends.push_back(std::make_unique<DX11::VideoBackend>());
   g_available_video_backends.push_back(std::make_unique<DX12::VideoBackend>());
 #endif
-  g_available_video_backends.push_back(std::make_unique<Vulkan::VideoBackend>());
 #ifdef HAS_OPENGL
   g_available_video_backends.push_back(std::make_unique<SW::VideoSoftware>());
 #endif
