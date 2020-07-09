@@ -25,6 +25,7 @@ void SetAdapterCallback(std::function<void(void)> func);
 void StartScanThread();
 void StopScanThread();
 GCPadStatus Input(int chan);
+void UpdateDevices();
 void Output(int chan, u8 rumble_command);
 bool IsDetected(const char** error_message);
 bool DeviceConnected(int chan);

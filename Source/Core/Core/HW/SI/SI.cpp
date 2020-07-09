@@ -23,7 +23,9 @@
 #include "Core/HW/SystemTimers.h"
 #include "Core/Movie.h"
 #include "Core/NetPlayProto.h"
+#include "Core/Config/MainSettings.h"
 
+#include "InputCommon/GCAdapter.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 namespace SerialInterface
@@ -472,6 +474,30 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
                    MMIO::DirectWrite<u32>(&s_channel[i].out.hex));
     mmio->Register(base | (SI_CHANNEL_0_IN_HI + 0xC * i),
                    MMIO::ComplexRead<u32>([i, rdst_bit](u32) {
+                     if(Config::Get(Config::MAIN_POLL_ON_SIREAD))
+                     {
+                        for(u8 c = 0; c < MAX_SI_CHANNELS; c++)
+                        {
+                          // First plugged in device
+                          if(s_channel[c].device->GetDeviceType() != SIDEVICE_NONE)
+                          {
+                            // If we're the first plugged in device
+                            if(c == i)
+                            {
+                              NetPlay::SetSIPollBatching(true);
+                              s_channel[0].device->GetData(s_channel[0].in_hi.hex, s_channel[0].in_lo.hex);
+                              s_channel[1].device->GetData(s_channel[1].in_hi.hex, s_channel[1].in_lo.hex);
+                              s_channel[2].device->GetData(s_channel[2].in_hi.hex, s_channel[2].in_lo.hex);
+                              s_channel[3].device->GetData(s_channel[3].in_hi.hex, s_channel[3].in_lo.hex);
+                              NetPlay::SetSIPollBatching(false);
+                            }
+
+                            // Quit here, we only poll once per frame
+                            break;
+                          }
+                        }
+                     }
+
                      s_status_reg.hex &= ~(1 << rdst_bit);
                      UpdateInterrupts();
                      return s_channel[i].in_hi.hex;
@@ -635,6 +661,13 @@ static void ChangeDeviceDeterministic(SIDevices device, int channel)
 
 void UpdateDevices()
 {
+  // Update inputs at the rate of SI
+  // Typically 120hz but is variable
+  g_controller_interface.UpdateInput();
+
+  // The adapter needs to update what devices are connected
+  GCAdapter::UpdateDevices();
+
   // Check for device change requests:
   for (int i = 0; i != MAX_SI_CHANNELS; ++i)
   {
@@ -647,28 +680,32 @@ void UpdateDevices()
     }
   }
 
-  // Hinting NetPlay that all controllers will be polled in
-  // succession, in order to optimize networking
-  NetPlay::SetSIPollBatching(true);
+  if(Config::Get(Config::MAIN_POLL_ON_SIREAD))
+  {
+    // Pretend there's new data so games that rely on these registers poll the device
+    s_status_reg.RDST0 = true;
+    s_status_reg.RDST1 = true;
+    s_status_reg.RDST2 = true;
+    s_status_reg.RDST3 = true;
+  }
+  else
+  {
+    NetPlay::SetSIPollBatching(true);
 
-  // Update inputs at the rate of SI
-  // Typically 120hz but is variable
-  g_controller_interface.UpdateInput();
-
-  // Update channels and set the status bit if there's new data
-  s_status_reg.RDST0 =
+    s_status_reg.RDST0 =
       !!s_channel[0].device->GetData(s_channel[0].in_hi.hex, s_channel[0].in_lo.hex);
-  s_status_reg.RDST1 =
+    s_status_reg.RDST1 =
       !!s_channel[1].device->GetData(s_channel[1].in_hi.hex, s_channel[1].in_lo.hex);
-  s_status_reg.RDST2 =
+    s_status_reg.RDST2 =
       !!s_channel[2].device->GetData(s_channel[2].in_hi.hex, s_channel[2].in_lo.hex);
-  s_status_reg.RDST3 =
+    s_status_reg.RDST3 =
       !!s_channel[3].device->GetData(s_channel[3].in_hi.hex, s_channel[3].in_lo.hex);
 
-  UpdateInterrupts();
+    NetPlay::SetSIPollBatching(false);
+  }
 
-  // Polling finished
-  NetPlay::SetSIPollBatching(false);
+  // Update channels and set the status bit if there's new data
+  UpdateInterrupts();
 }
 
 SIDevices GetDeviceType(int channel)
