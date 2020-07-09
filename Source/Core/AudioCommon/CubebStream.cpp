@@ -26,12 +26,19 @@ long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void
   {
     std::lock_guard<std::mutex> guard(self->m_short_buffer_mutex);
 
+    if(self->m_short_buffer.size() < 2)
+    {
+      self->m_short_buffer.push_back(0); // need at least one frame/two samples
+      self->m_short_buffer.push_back(0);
+    }
+
     for(std::size_t sample = 0; sample < num_frames * 2; sample += 2)
     {
+      // TODO: maybe not a good idea to reuse the last sample
       static_cast<short*>(output_buffer)[sample] =
-        Common::swap16(sample >= self->m_short_buffer.size() ? 0 : self->m_short_buffer[sample]);
+        Common::swap16(sample >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 2] : self->m_short_buffer[sample]);
       static_cast<short*>(output_buffer)[sample + 1] =
-        Common::swap16(sample + 1 >= self->m_short_buffer.size() ? 0 : self->m_short_buffer[sample + 1]);
+        Common::swap16(sample + 1 >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 1] : self->m_short_buffer[sample + 1]);
     }
 
     if(self->m_short_buffer.size() < num_frames * 2)
@@ -76,7 +83,7 @@ bool CubebStream::Init()
     ERROR_LOG(AUDIO, "Error getting minimum latency");
   INFO_LOG(AUDIO, "Minimum latency: %i frames", minimum_latency);
 
-  m_max_frames_in_flight = std::max(minimum_latency, MIN_BUFFER_FRAMES) + 32;
+  m_max_frames_in_flight = std::max(minimum_latency, MIN_BUFFER_FRAMES) + 32; // add 1 ms to what cubeb expects in case the DSP is late
   m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
   m_short_buffer.reserve(m_max_frames_in_flight * 2);
 
