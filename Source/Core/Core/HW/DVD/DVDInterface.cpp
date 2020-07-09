@@ -26,6 +26,7 @@
 #include "Core/HW/AudioInterface.h"
 #include "Core/HW/DVD/DVDMath.h"
 #include "Core/HW/DVD/DVDThread.h"
+#include "Core/HW/DVD/FileMonitor.h"
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
 #include "Core/HW/MMIO.h"
 #include "Core/HW/Memmap.h"
@@ -1320,7 +1321,7 @@ void ScheduleReads(u64 offset, u32 length, const DiscIO::Partition& partition, u
   u64 dvd_offset = DVDThread::PartitionOffsetToRawOffset(offset, partition);
   dvd_offset = Common::AlignDown(dvd_offset, DVD_ECC_BLOCK_SIZE);
 
-  if (SConfig::GetInstance().bFastDiscSpeed)
+  if (SConfig::GetInstance().bFastDiscSpeed && FileMonitor::GetFileNameAt(*DVDThread::GetDisc(), partition, dvd_offset).find("audio") == std::string::npos)
   {
     // The SUDTR setting makes us act as if all reads are buffered
     buffer_start = std::numeric_limits<u64>::min();

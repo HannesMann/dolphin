@@ -39,6 +39,7 @@ void Start();
 void Stop();
 void DoState(PointerWrap& p);
 
+DiscIO::Volume* GetDisc();
 void SetDisc(std::unique_ptr<DiscIO::Volume> disc);
 bool HasDisc();
 

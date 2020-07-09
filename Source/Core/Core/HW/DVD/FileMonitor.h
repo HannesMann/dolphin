@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Common/CommonTypes.h"
+#include <string>
 
 namespace DiscIO
 {
@@ -15,4 +16,5 @@ class Volume;
 namespace FileMonitor
 {
 void Log(const DiscIO::Volume& volume, const DiscIO::Partition& partition, u64 offset);
+std::string GetFileNameAt(const DiscIO::Volume& volume, const DiscIO::Partition& partition, u64 offset);
 }

@@ -175,6 +175,11 @@ void DoState(PointerWrap& p)
   // was made. Handling that properly may be more effort than it's worth.
 }
 
+DiscIO::Volume* GetDisc()
+{
+  return s_disc.get();
+}
+
 void SetDisc(std::unique_ptr<DiscIO::Volume> disc)
 {
   WaitUntilIdle();
