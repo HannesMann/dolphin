@@ -87,7 +87,7 @@ bool CubebStream::Init()
     ERROR_LOG(AUDIO, "Error getting minimum latency");
   INFO_LOG(AUDIO, "Minimum latency: %i frames", minimum_latency);
 
-  m_max_frames_in_flight = std::max(minimum_latency, ONE_DSP_BUFFER * 2);
+  m_max_frames_in_flight = ONE_DSP_BUFFER * 2;
   m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
   m_short_buffer.reserve(m_max_frames_in_flight * 2);
 
@@ -95,7 +95,7 @@ bool CubebStream::Init()
   //NOTICE_LOG(AUDIO, "Minimum latency from Cubeb in frames: %u", minimum_latency);
 
   return cubeb_stream_init(m_ctx.get(), &m_stream, "Dolphin Audio Output", nullptr, nullptr,
-                           nullptr, &params, std::max(minimum_latency, ONE_DSP_BUFFER * 2),
+                           nullptr, &params, ONE_DSP_BUFFER * 2,
                            DataCallback, StateCallback, this) == CUBEB_OK;
 }
 
