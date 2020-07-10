@@ -15,7 +15,7 @@
 #include "Core/Core.h"
 #include "Common/Swap.h"
 
-constexpr u32 MIN_BUFFER_FRAMES = 160;
+constexpr u32 ONE_DSP_BUFFER = 160;
 
 long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void* /*input_buffer*/,
                                void* output_buffer, long num_frames)
@@ -24,6 +24,7 @@ long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void
 
   if (self->m_stereo)
   {
+    //NOTICE_LOG(AUDIO, "Cubeb wants %lu frames", num_frames);
     std::lock_guard<std::mutex> guard(self->m_short_buffer_mutex);
 
     if(self->m_short_buffer.size() < 2)
@@ -41,8 +42,11 @@ long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void
         Common::swap16(sample + 1 >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 1] : self->m_short_buffer[sample + 1]);
     }
 
-    if(self->m_short_buffer.size() < num_frames * 2)
+    if (self->m_short_buffer.size() < num_frames * 2)
+    {
+      //NOTICE_LOG(AUDIO, "Underflow from our side by %lu frames", num_frames - (self->m_short_buffer.size() / 2));
       self->m_short_buffer.erase(self->m_short_buffer.begin(), self->m_short_buffer.end());
+    }
     else
       self->m_short_buffer.erase(self->m_short_buffer.begin(), self->m_short_buffer.begin() + num_frames * 2);
   }
@@ -83,12 +87,15 @@ bool CubebStream::Init()
     ERROR_LOG(AUDIO, "Error getting minimum latency");
   INFO_LOG(AUDIO, "Minimum latency: %i frames", minimum_latency);
 
-  m_max_frames_in_flight = std::max(minimum_latency, MIN_BUFFER_FRAMES) + 32; // add 1 ms to what cubeb expects in case the DSP is late
+  m_max_frames_in_flight = std::max(minimum_latency, ONE_DSP_BUFFER * 2);
   m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
   m_short_buffer.reserve(m_max_frames_in_flight * 2);
 
+  //NOTICE_LOG(AUDIO, "Max frames in flight: %u", m_max_frames_in_flight);
+  //NOTICE_LOG(AUDIO, "Minimum latency from Cubeb in frames: %u", minimum_latency);
+
   return cubeb_stream_init(m_ctx.get(), &m_stream, "Dolphin Audio Output", nullptr, nullptr,
-                           nullptr, &params, std::max(minimum_latency, MIN_BUFFER_FRAMES),
+                           nullptr, &params, std::max(minimum_latency, ONE_DSP_BUFFER * 2),
                            DataCallback, StateCallback, this) == CUBEB_OK;
 }
 
