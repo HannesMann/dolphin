@@ -18,8 +18,11 @@
 #include "Common/Logging/Log.h"
 #include "Common/StringUtil.h"
 #include "Common/Thread.h"
+#include "common/Swap.h"
 #include "Core/ConfigManager.h"
 #include "VideoCommon/OnScreenDisplay.h"
+
+constexpr u32 ONE_DSP_BUFFER = 160;
 
 WASAPIStream::WASAPIStream()
 {
@@ -27,7 +30,7 @@ WASAPIStream::WASAPIStream()
 
   m_format.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
   m_format.Format.nChannels = 2;
-  m_format.Format.nSamplesPerSec = GetMixer()->GetSampleRate();
+  m_format.Format.nSamplesPerSec = 32000;
   m_format.Format.nAvgBytesPerSec = m_format.Format.nSamplesPerSec * 4;
   m_format.Format.nBlockAlign = 4;
   m_format.Format.wBitsPerSample = 16;
@@ -297,7 +300,7 @@ bool WASAPIStream::SetRunning(bool running)
 
     if (result == AUDCLNT_E_UNSUPPORTED_FORMAT)
     {
-      OSD::AddMessage("Your current audio device doesn't support 16-bit 48000 hz PCM audio. WASAPI "
+      OSD::AddMessage("Your current audio device doesn't support 16-bit 32000 hz PCM audio. WASAPI "
                       "exclusive mode won't work.",
                       6000U);
       return false;
@@ -305,7 +308,7 @@ bool WASAPIStream::SetRunning(bool running)
 
     if (result == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
     {
-      result = m_audio_client->GetBufferSize(&m_frames_in_buffer);
+      result = m_audio_client->GetBufferSize(&m_requested_frames);
       m_audio_client->Release();
 
       if (!HandleWinAPI("Failed to get aligned buffer size", result))
@@ -328,7 +331,7 @@ bool WASAPIStream::SetRunning(bool running)
 
       device_period =
           static_cast<REFERENCE_TIME>(
-              10000.0 * 1000 * m_frames_in_buffer / m_format.Format.nSamplesPerSec + 0.5) +
+              10000.0 * 1000 * m_requested_frames / m_format.Format.nSamplesPerSec + 0.5) +
           SConfig::GetInstance().iLatency * 10000;
 
       result = m_audio_client->Initialize(
@@ -345,7 +348,7 @@ bool WASAPIStream::SetRunning(bool running)
       return false;
     }
 
-    result = m_audio_client->GetBufferSize(&m_frames_in_buffer);
+    result = m_audio_client->GetBufferSize(&m_requested_frames);
 
     if (!HandleWinAPI("Failed to get buffer size from IAudioClient", result))
     {
@@ -384,6 +387,10 @@ bool WASAPIStream::SetRunning(bool running)
 
     device->Release();
 
+    m_max_frames_in_flight = std::max(m_requested_frames, ONE_DSP_BUFFER * 2);
+    m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
+    m_short_buffer.reserve(m_max_frames_in_flight * 2);
+
     INFO_LOG(AUDIO, "WASAPI: Successfully initialized!");
 
     m_running = true;
@@ -421,8 +428,8 @@ void WASAPIStream::SoundLoop()
 
   if (m_audio_renderer)
   {
-    m_audio_renderer->GetBuffer(m_frames_in_buffer, &data);
-    m_audio_renderer->ReleaseBuffer(m_frames_in_buffer, AUDCLNT_BUFFERFLAGS_SILENT);
+    m_audio_renderer->GetBuffer(m_requested_frames, &data);
+    m_audio_renderer->ReleaseBuffer(m_requested_frames, AUDCLNT_BUFFERFLAGS_SILENT);
   }
 
   m_stopped = false;
@@ -434,18 +441,58 @@ void WASAPIStream::SoundLoop()
 
     WaitForSingleObject(m_need_data_event, 1000);
 
-    m_audio_renderer->GetBuffer(m_frames_in_buffer, &data);
-    GetMixer()->Mix(reinterpret_cast<s16*>(data), m_frames_in_buffer);
+    m_audio_renderer->GetBuffer(m_requested_frames, &data);
 
-    float volume = SConfig::GetInstance().m_IsMuted ? 0 : SConfig::GetInstance().m_Volume / 100.;
+    float volume = SConfig::GetInstance().m_IsMuted ? 0 : SConfig::GetInstance().m_Volume / 100.0;
 
-    for (u32 i = 0; i < m_frames_in_buffer * 2; i++)
-      reinterpret_cast<s16*>(data)[i] = static_cast<s16>(reinterpret_cast<s16*>(data)[i] * volume);
+    {
+      std::lock_guard<std::mutex> guard(m_short_buffer_mutex);
 
-    m_audio_renderer->ReleaseBuffer(m_frames_in_buffer, 0);
+      if (m_short_buffer.size() < 2)
+      {
+        m_short_buffer.push_back(0);  // need at least one frame/two samples
+        m_short_buffer.push_back(0);
+      }
+
+      for (std::size_t sample = 0; sample < m_requested_frames * 2; sample += 2)
+      {
+        reinterpret_cast<short*>(data)[sample] = static_cast<s16>(Common::swap16(
+            sample >= m_short_buffer.size() ? m_short_buffer[m_short_buffer.size() - 2] :
+                                              m_short_buffer[sample]) * volume);
+        reinterpret_cast<short*>(data)[sample + 1] = static_cast<s16>(Common::swap16(
+            sample + 1 >= m_short_buffer.size() ? m_short_buffer[m_short_buffer.size() - 1] :
+                                                m_short_buffer[sample + 1]) * volume);
+      }
+
+      if (m_short_buffer.size() < m_requested_frames * 2)
+      {
+        // NOTICE_LOG(AUDIO, "Underflow from our side by %lu frames", num_frames -
+        // (m_short_buffer.size() / 2));
+        m_short_buffer.erase(m_short_buffer.begin(), m_short_buffer.end());
+      }
+      else
+        m_short_buffer.erase(m_short_buffer.begin(),
+                             m_short_buffer.begin() + m_requested_frames * 2);
+    }
+
+    m_audio_renderer->ReleaseBuffer(m_requested_frames, 0);
   }
 
   m_stopped = true;
+}
+
+void WASAPIStream::PushSamples(const short* samples, unsigned int num_samples)
+{
+  if (samples)
+  {
+    std::lock_guard<std::mutex> guard(m_short_buffer_mutex);
+    m_short_buffer.insert(m_short_buffer.end(), &samples[0],
+                          &samples[num_samples * 2] /* last is L+R */);
+
+    if (m_short_buffer.size() > m_max_frames_in_flight * 2)
+      m_short_buffer.erase(m_short_buffer.begin(),
+                           m_short_buffer.end() - m_max_frames_in_flight * 2);
+  }
 }
 
 #endif  // _WIN32
