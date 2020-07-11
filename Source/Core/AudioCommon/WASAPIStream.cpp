@@ -279,10 +279,8 @@ bool WASAPIStream::SetRunning(bool running)
     }
 
     REFERENCE_TIME device_period = 0;
-
+    // TODO: this should match iLatency but I get errors of "unaligned buffer" when changing it
     result = m_audio_client->GetDevicePeriod(nullptr, &device_period);
-
-    device_period += std::max(0, SConfig::GetInstance().iLatency - 5) * (10000 / m_format.Format.nChannels);
     INFO_LOG(AUDIO, "Audio period set to %d", device_period);
 
     if (!HandleWinAPI("Failed to obtain device period", result))
@@ -295,7 +293,8 @@ bool WASAPIStream::SetRunning(bool running)
 
     result = m_audio_client->Initialize(
         AUDCLNT_SHAREMODE_EXCLUSIVE,
-        AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST, device_period,
+        AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST,
+        device_period,
         device_period, reinterpret_cast<WAVEFORMATEX*>(&m_format), nullptr);
 
     if (result == AUDCLNT_E_UNSUPPORTED_FORMAT)
@@ -331,8 +330,7 @@ bool WASAPIStream::SetRunning(bool running)
 
       device_period =
           static_cast<REFERENCE_TIME>(
-              10000.0 * 1000 * m_requested_frames / m_format.Format.nSamplesPerSec + 0.5) +
-          SConfig::GetInstance().iLatency * 10000;
+              10000.0 * 1000 * m_requested_frames / m_format.Format.nSamplesPerSec + 0.5);
 
       result = m_audio_client->Initialize(
           AUDCLNT_SHAREMODE_EXCLUSIVE,
@@ -387,7 +385,7 @@ bool WASAPIStream::SetRunning(bool running)
 
     device->Release();
 
-    m_max_frames_in_flight = std::max(m_requested_frames, ONE_DSP_BUFFER * 2);
+    m_max_frames_in_flight = ONE_DSP_BUFFER + 32 * std::max(0, SConfig::GetInstance().iLatency - 5);
     m_short_buffer = std::vector<short>(m_max_frames_in_flight, 0);
     m_short_buffer.reserve(m_max_frames_in_flight * 2);
 
@@ -404,14 +402,13 @@ bool WASAPIStream::SetRunning(bool running)
     if (m_thread.joinable())
       m_thread.join();
 
-    while (!m_stopped)
-    {
-    }
-
     if (m_audio_client)
     {
-      m_audio_renderer->Release();
-      m_audio_renderer = nullptr;
+      if (m_audio_renderer)
+      {
+        m_audio_renderer->Release();
+        m_audio_renderer = nullptr;
+      }
 
       m_audio_client->Release();
       m_audio_client = nullptr;
@@ -483,7 +480,7 @@ void WASAPIStream::SoundLoop()
 
 void WASAPIStream::PushSamples(const short* samples, unsigned int num_samples)
 {
-  if (samples)
+  if (m_audio_client && samples)
   {
     std::lock_guard<std::mutex> guard(m_short_buffer_mutex);
     m_short_buffer.insert(m_short_buffer.end(), &samples[0],
