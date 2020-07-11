@@ -123,7 +123,7 @@ struct SConfig
   bool bCopyWiiSaveNetplay = true;
 
   bool bDPL2Decoder = false;
-  int iLatency = 20;
+  int iLatency = 10;
   bool m_audio_stretch = false;
   int m_audio_stretch_max_latency = 80;
 

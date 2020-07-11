@@ -85,10 +85,10 @@ void AudioPane::CreateWidgets()
   {
     m_latency_label = new QLabel(tr("Latency:"));
     m_latency_spin = new QSpinBox();
-    m_latency_spin->setMinimum(0);
+    m_latency_spin->setMinimum(5);
     m_latency_spin->setMaximum(200);
     m_latency_spin->setToolTip(tr("Sets the latency (in ms). Higher values may reduce audio "
-                                  "crackling. Certain backends only."));
+                                  "crackling. Certain backends only. SSBM outputs audio in 5 ms increments, using values below 10 ms is not recommended as at least one full buffer should be kept to prevent underruns."));
   }
 
   m_dolby_pro_logic->setToolTip(

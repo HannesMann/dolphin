@@ -104,7 +104,7 @@ bool SupportsDPL2Decoder(std::string_view backend)
 
 bool SupportsLatencyControl(std::string_view backend)
 {
-  return backend == BACKEND_WASAPI;
+  return backend == BACKEND_CUBEB || backend == BACKEND_WASAPI;
 }
 
 bool SupportsVolumeChanges(std::string_view backend)

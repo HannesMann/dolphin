@@ -282,7 +282,7 @@ bool WASAPIStream::SetRunning(bool running)
 
     result = m_audio_client->GetDevicePeriod(nullptr, &device_period);
 
-    device_period += SConfig::GetInstance().iLatency * (10000 / m_format.Format.nChannels);
+    device_period += std::max(0, SConfig::GetInstance().iLatency - 5) * (10000 / m_format.Format.nChannels);
     INFO_LOG(AUDIO, "Audio period set to %d", device_period);
 
     if (!HandleWinAPI("Failed to obtain device period", result))
