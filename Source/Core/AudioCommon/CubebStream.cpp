@@ -37,9 +37,9 @@ long CubebStream::DataCallback(cubeb_stream* stream, void* user_data, const void
     {
       // TODO: maybe not a good idea to reuse the last sample
       static_cast<short*>(output_buffer)[sample] =
-        Common::swap16(sample >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 2] : self->m_short_buffer[sample]);
-      static_cast<short*>(output_buffer)[sample + 1] =
         Common::swap16(sample + 1 >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 1] : self->m_short_buffer[sample + 1]);
+      static_cast<short*>(output_buffer)[sample + 1] =
+        Common::swap16(sample >= self->m_short_buffer.size() ? self->m_short_buffer[self->m_short_buffer.size() - 2] : self->m_short_buffer[sample]);
     }
 
     if (self->m_short_buffer.size() < num_frames * 2)

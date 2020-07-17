@@ -454,11 +454,11 @@ void WASAPIStream::SoundLoop()
       for (std::size_t sample = 0; sample < m_requested_frames * 2; sample += 2)
       {
         reinterpret_cast<short*>(data)[sample] = static_cast<s16>(Common::swap16(
-            sample >= m_short_buffer.size() ? m_short_buffer[m_short_buffer.size() - 2] :
-                                              m_short_buffer[sample]) * volume);
-        reinterpret_cast<short*>(data)[sample + 1] = static_cast<s16>(Common::swap16(
             sample + 1 >= m_short_buffer.size() ? m_short_buffer[m_short_buffer.size() - 1] :
-                                                m_short_buffer[sample + 1]) * volume);
+                                              m_short_buffer[sample + 1]) * volume);
+        reinterpret_cast<short*>(data)[sample + 1] = static_cast<s16>(Common::swap16(
+            sample >= m_short_buffer.size() ? m_short_buffer[m_short_buffer.size() - 2] :
+                                                m_short_buffer[sample]) * volume);
       }
 
       if (m_short_buffer.size() < m_requested_frames * 2)
